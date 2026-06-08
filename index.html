@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5A 班天仁茗茶點餐系統</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Noto Sans TC & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        tenren: {
+                            50: '#f2f8f5',
+                            100: '#e1efe7',
+                            500: '#005a36', // Ten Ren's Signature Green
+                            600: '#004d2e',
+                            700: '#003f25',
+                            900: '#002516',
+                            accent: '#d9a74a' // Warm Gold
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans TC', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #f7faf8;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c5dcd0;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #005a36;
+        }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen flex flex-col">
+
+    <!-- Header Navbar -->
+    <header class="bg-tenren-500 text-white shadow-md sticky top-0 z-40 transition-all">
+        <div class="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-white p-1.5 rounded-full shadow-inner flex items-center justify-center w-10 h-10">
+                    <span class="text-tenren-500 font-black text-xl">茶</span>
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-bold tracking-wide flex items-center">
+                        5A 天仁茗茶點餐系統
+                        <span class="ml-2 px-2 py-0.5 bg-tenren-accent text-tenren-900 text-xs font-black rounded-full shadow-sm">33 人專用</span>
+                    </h1>
+                    <p class="text-xs text-tenren-100 opacity-90 hidden sm:block">即時連線同步 • 班級團購神器</p>
+                </div>
+            </div>
+            <!-- Share & Sync Group -->
+            <div class="flex items-center space-x-3">
+                <button onclick="window.showQRCode()" class="flex items-center space-x-1.5 px-3 py-1.5 bg-tenren-accent hover:bg-yellow-500 text-tenren-900 rounded-full text-xs font-black shadow transition-all duration-200">
+                    <i class="fa-solid fa-qrcode"></i>
+                    <span>分享 QR Code</span>
+                </button>
+                <!-- Sync Status Indicator -->
+                <div id="syncStatus" class="flex items-center space-x-2 px-3 py-1.5 bg-tenren-600 rounded-full text-xs text-green-300">
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    <span id="syncText">雲端連線中...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-white border-b border-gray-200 sticky top-[64px] z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex space-x-6 overflow-x-auto">
+                <button onclick="switchTab('order-tab')" id="btn-order-tab" class="tab-btn py-4 px-2 border-b-2 border-tenren-500 text-tenren-500 font-medium text-sm flex items-center space-x-2 whitespace-nowrap">
+                    <i class="fa-solid fa-mug-hot"></i>
+                    <span>快速點餐</span>
+                </button>
+                <button onclick="switchTab('grid-tab')" id="btn-grid-tab" class="tab-btn py-4 px-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm flex items-center space-x-2 whitespace-nowrap">
+                    <i class="fa-solid fa-table-cells"></i>
+                    <span>全班點餐面板 (<span id="orderedCount">0</span>/33)</span>
+                </button>
+                <button onclick="switchTab('summary-tab')" id="btn-summary-tab" class="tab-btn py-4 px-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm flex items-center space-x-2 whitespace-nowrap">
+                    <i class="fa-solid fa-receipt"></i>
+                    <span>訂單統計與落單</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
+        
+        <!-- Notification Toast System -->
+        <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 pointer-events-none">
+            <div id="toastIcon" class="text-tenren-accent"><i class="fa-solid fa-circle-check"></i></div>
+            <p id="toastMessage" class="text-sm font-medium"></p>
+        </div>
+
+        <!-- Tab 1: Order Form -->
+        <section id="order-tab" class="tab-content block space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Left Column: Guide & Quick Select Seat -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+                    <div class="border-b border-gray-100 pb-3">
+                        <h2 class="text-lg font-bold text-gray-900 flex items-center space-x-2">
+                            <span class="w-2 h-5 bg-tenren-accent rounded-full"></span>
+                            <span>第一步：選擇您的座號</span>
+                        </h2>
+                        <p class="text-xs text-gray-500 mt-1">請在 5A 班 33 個座號中選擇您的號碼進行點餐。</p>
+                    </div>
+
+                    <!-- Quick Seat Selector -->
+                    <div class="grid grid-cols-5 gap-2 max-h-[320px] overflow-y-auto pr-1">
+                        <!-- Student buttons 1-33 will be generated by JS -->
+                        <div id="quickSeatContainer" class="col-span-5 grid grid-cols-5 gap-2"></div>
+                    </div>
+
+                    <div class="bg-tenren-50 rounded-xl p-4 text-xs text-tenren-900 space-y-1">
+                        <div class="font-bold flex items-center text-tenren-600 mb-1">
+                            <i class="fa-solid fa-circle-info mr-1.5"></i> 溫馨提示
+                        </div>
+                        <p>1. 點擊您的座號後，填寫姓名並選擇飲品即可提交。</p>
+                        <p>2. 若您的座號已被他人點餐，您可以點擊它進行修改或重置。</p>
+                    </div>
+                </div>
+
+                <!-- Middle Column: Product Details & Customs -->
+                <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+                    <div class="border-b border-gray-100 pb-3 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-gray-900 flex items-center space-x-2">
+                            <span class="w-2 h-5 bg-tenren-accent rounded-full"></span>
+                            <span>第二步：選擇飲品與甜度冰量</span>
+                        </h2>
+                        <span id="selectedSeatBadge" class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">
+                            尚未選擇座號
+                        </span>
+                    </div>
+
+                    <!-- Form Input Name -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1.5">同學中文名 / 暱稱 <span class="text-red-500">*</span></label>
+                            <div class="relative rounded-xl shadow-sm">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                    <i class="fa-solid fa-user"></i>
+                                </div>
+                                <input type="text" id="studentName" placeholder="例如：小明" class="block w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-tenren-500 focus:bg-white transition-all">
+                            </div>
+                        </div>
+                        <div class="hidden">
+                            <input type="hidden" id="studentSeatId" value="">
+                        </div>
+                    </div>
+
+                    <!-- Drink Selection Cards -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2.5">選擇天仁茗茶飲品 <span class="text-red-500">*</span></label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="drinkOptions">
+                            <!-- Options will be generated, restricted strictly to user request -->
+                        </div>
+                    </div>
+
+                    <!-- Customize Rows -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl">
+                        <!-- Sugar Level -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">甜度選擇</label>
+                            <select id="sugarLevel" class="block w-full bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tenren-500 transition-all">
+                                <option value="正常糖 (100%)">正常糖 (100%)</option>
+                                <option value="少糖 (70%)">少糖 (70%)</option>
+                                <option value="半糖 (50%)" selected>半糖 (50%)</option>
+                                <option value="微糖 (30%)">微糖 (30%)</option>
+                                <option value="無糖 (0%)">無糖 (0%)</option>
+                            </select>
+                        </div>
+
+                        <!-- Ice Level -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">冰量選擇</label>
+                            <select id="iceLevel" class="block w-full bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tenren-500 transition-all">
+                                <option value="正常冰">正常冰</option>
+                                <option value="少冰">少冰</option>
+                                <option value="微冰" selected>微冰</option>
+                                <option value="去冰">去冰</option>
+                                <option value="熱飲">熱飲</option>
+                            </select>
+                        </div>
+
+                        <!-- Size selection -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">杯量大小</label>
+                            <div class="flex space-x-2">
+                                <label class="flex-1 cursor-pointer">
+                                    <input type="radio" name="drinkSize" value="中杯 (M)" checked class="sr-only peer">
+                                    <div class="text-center py-2 text-xs font-bold rounded-lg border border-gray-200 bg-white peer-checked:bg-tenren-500 peer-checked:text-white peer-checked:border-transparent transition-all">
+                                        中杯 M
+                                    </div>
+                                </label>
+                                <label class="flex-1 cursor-pointer">
+                                    <input type="radio" name="drinkSize" value="大杯 (L)" class="sr-only peer">
+                                    <div class="text-center py-2 text-xs font-bold rounded-lg border border-gray-200 bg-white peer-checked:bg-tenren-500 peer-checked:text-white peer-checked:border-transparent transition-all">
+                                        大杯 L
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit section -->
+                    <div class="pt-4 border-t border-gray-100 flex flex-col sm:flex-row gap-3 justify-between items-center">
+                        <span class="text-xs text-gray-400 flex items-center">
+                            <i class="fa-solid fa-shield-halved mr-1"></i> 點餐後會同步更新至全班看板
+                        </span>
+                        <div class="flex space-x-3 w-full sm:w-auto">
+                            <button type="button" onclick="clearForm()" class="flex-1 sm:flex-none px-4 py-2.5 border border-gray-200 text-gray-500 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all">
+                                重置輸入
+                            </button>
+                            <button type="button" onclick="submitOrder()" class="flex-1 sm:flex-none px-6 py-2.5 bg-tenren-500 hover:bg-tenren-600 text-white rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center space-x-2">
+                                <i class="fa-regular fa-paper-plane"></i>
+                                <span>確認並送出訂單</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab 2: 33 Students Interactive Grid -->
+        <section id="grid-tab" class="tab-content hidden space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-4 mb-6 gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900 flex items-center space-x-2">
+                            <i class="fa-solid fa-users text-tenren-500"></i>
+                            <span>5A 班級點餐實時大面板 (共 33 席)</span>
+                        </h2>
+                        <p class="text-xs text-gray-500 mt-1">點擊任何座號可以快速為該名同學修改點餐、或查看點餐細節。</p>
+                    </div>
+                    <!-- Legend -->
+                    <div class="flex space-x-4 text-xs font-semibold">
+                        <div class="flex items-center space-x-1.5">
+                            <span class="w-3.5 h-3.5 rounded-md bg-tenren-100 border border-tenren-500 inline-block"></span>
+                            <span class="text-gray-600">已點餐</span>
+                        </div>
+                        <div class="flex items-center space-x-1.5">
+                            <span class="w-3.5 h-3.5 rounded-md bg-gray-50 border border-gray-200 inline-block"></span>
+                            <span class="text-gray-400">未點餐</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 33 Grid Wrapper -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4" id="seatingGrid">
+                    <!-- 33 grid items generated via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab 3: Summary & Order Statistics -->
+        <section id="summary-tab" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Left Details: Summary Stats -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Total Count Card -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                        <h3 class="text-base font-bold text-gray-900 mb-4 flex items-center space-x-2">
+                            <i class="fa-solid fa-chart-pie text-tenren-accent"></i>
+                            <span>5A 飲品統計清單</span>
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="statsContainer">
+                            <!-- Populated with item statistics -->
+                        </div>
+                    </div>
+
+                    <!-- Customization Details Accordion -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                        <h3 class="text-base font-bold text-gray-900 mb-4 flex items-center space-x-2">
+                            <i class="fa-solid fa-list-check text-tenren-500"></i>
+                            <span>全班細節對數清單 (33人)</span>
+                        </h3>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">座號</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">姓名</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">點選飲品</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">規格</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">付款狀態</th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">動作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-100" id="summaryTableBody">
+                                    <!-- Populated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Details: Action Panel & WhatsApp Export -->
+                <div class="space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4 sticky top-[140px]">
+                        <h3 class="text-base font-bold text-gray-900 flex items-center space-x-2">
+                            <i class="fa-solid fa-paperclip text-tenren-accent"></i>
+                            <span>一鍵落單與複製</span>
+                        </h3>
+                        <p class="text-xs text-gray-500">這裏為負責訂餐的同學（如班長）自動整理好格式化的文字。您可以複製直接發給店員、或發在班級通訊群組內。</p>
+
+                        <!-- Text Preview Box -->
+                        <div class="relative">
+                            <textarea id="copyTemplateArea" readonly rows="12" class="w-full text-xs font-mono bg-gray-50 border border-gray-200 rounded-xl p-3 focus:outline-none focus:ring-1 focus:ring-tenren-500 resize-none" placeholder="尚未有人點餐..."></textarea>
+                            <div class="absolute bottom-2 right-2">
+                                <span class="bg-gray-200 text-gray-600 px-2 py-1 rounded text-[10px] font-bold">預覽</span>
+                            </div>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div class="space-y-2">
+                            <button onclick="copyOrderText()" class="w-full py-3 bg-tenren-500 hover:bg-tenren-600 text-white rounded-xl text-sm font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center space-x-2">
+                                <i class="fa-regular fa-copy"></i>
+                                <span>複製天仁茗茶訂單格式</span>
+                            </button>
+                            <button onclick="resetAllOrdersModal()" class="w-full py-2.5 border border-red-200 hover:bg-red-50 text-red-600 rounded-xl text-xs font-semibold transition-all flex items-center justify-center space-x-2">
+                                <i class="fa-regular fa-trash-can"></i>
+                                <span>重置 5A 班所有訂單數據</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Detail / Edit Modal Container -->
+    <div id="detailModal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <!-- Background overlay -->
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeDetailModal()"></div>
+
+            <!-- Modal Panel -->
+            <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full p-6">
+                <div class="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
+                    <h3 class="text-base font-bold text-gray-900" id="modalTitle">
+                        座號詳細資訊
+                    </h3>
+                    <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-500 transition-all">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4" id="modalContent">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Popup Modal -->
+    <div id="qrModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="window.closeQRModal()"></div>
+            <div class="bg-white rounded-2xl overflow-hidden shadow-2xl transform transition-all max-w-sm w-full p-6 z-10 space-y-4 text-center">
+                <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+                    <h3 class="text-base font-bold text-gray-900 flex items-center space-x-2">
+                        <i class="fa-solid fa-qrcode text-tenren-500"></i>
+                        <span>手機掃描快速點餐</span>
+                    </h3>
+                    <button onclick="window.closeQRModal()" class="text-gray-400 hover:text-gray-500 transition-colors">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <p class="text-xs text-gray-500 leading-relaxed">請 5A 班同學直接使用手機或 iPad 相機掃描下方 QR Code，即可開啟系統進行同步點餐！</p>
+                
+                <div class="flex justify-center p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <img id="qrCodeImg" src="" alt="QR Code" class="w-48 h-48 border border-gray-200 rounded-lg shadow-inner bg-white" onerror="this.src='https://placehold.co/200x200/e1efe7/005a36?text=QR+Error'">
+                </div>
+                
+                <div class="space-y-1.5 text-left">
+                    <label class="block text-xs font-bold text-gray-500">分享系統網址：</label>
+                    <div class="flex">
+                        <input type="text" id="qrUrlInput" readonly class="flex-1 bg-gray-50 border border-gray-200 rounded-l-xl px-3 py-2 text-xs focus:outline-none truncate select-all">
+                        <button onclick="window.copyQRLink()" class="bg-tenren-500 hover:bg-tenren-600 text-white px-4 rounded-r-xl text-xs font-bold transition-all flex items-center space-x-1">
+                            <i class="fa-regular fa-copy"></i>
+                            <span>複製</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simple Custom Modal for Warnings/Confirmations (No window.alert allowed) -->
+    <div id="confirmModal" class="fixed inset-0 z-50 overflow-y-auto hidden">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="closeConfirmModal()"></div>
+            <div class="bg-white rounded-2xl overflow-hidden shadow-2xl transform transition-all max-w-sm w-full p-6 z-10 space-y-4">
+                <div class="text-center">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 text-red-600 mb-3 text-xl">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900" id="confirmTitle">確認重置？</h3>
+                    <p class="text-sm text-gray-500 mt-2" id="confirmText">此操作將永久清除全班 5A 班級所有訂單，並且無法復原。</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="closeConfirmModal()" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold transition-all">取消</button>
+                    <button id="confirmBtnAction" class="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-all">確認重置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-6 mt-12 border-t border-gray-800 text-center text-xs">
+        <p class="mb-1">5A 天仁茗茶下單系統 © 2026. All rights reserved.</p>
+        <p class="text-gray-600">專為 5A 班打造的自訂茶品訂購網頁 • 使用 Firestore 實時協同運作</p>
+    </footer>
+
+    <!-- Firebase Module Setup -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, query, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Constants and Globals provided by the system
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'tenren-5a-ordering-system';
+        
+        let firebaseConfig = {};
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } catch (e) {
+                console.error("Firebase config parse error: ", e);
+            }
+        } else {
+            // Local sandbox fallback config (mocked locally, will connect if environment matches)
+            firebaseConfig = {
+                apiKey: "mock-api-key",
+                authDomain: "mock.firebaseapp.com",
+                projectId: "mock-project",
+                storageBucket: "mock.appspot.com",
+                messagingSenderId: "123456789",
+                appId: "1:1234:web:abcd"
+            };
+        }
+
+        // Initialize App & Services
+        let app, db, auth;
+        let isOnline = false;
+        let ordersData = {}; // Keeps local state in sync
+
+        // Restricted drinks as specified by user
+        const DRINK_OPTIONS = [
+            { id: 'jas-green', name: '茉香奶綠', emoji: '🍵', desc: '清雅茉莉茶香結合香醇奶綠' },
+            { id: 'gold-milk', name: '金香奶茶', emoji: '☕', desc: '金黃焙火茶感，甘醇絲滑' },
+            { id: 'pearl-milk', name: '珍珠奶茶', emoji: '🧋', desc: '招牌Q彈黑珍珠搭配經典天仁奶茶' },
+            { id: 'pearl-green', name: '珍珠奶綠', emoji: '🍃', desc: '珍珠配茉香綠奶，雙重清爽口感' },
+            { id: 'lemon-black', name: '檸檬紅茶', emoji: '🍋', desc: '新鮮檸檬微酸與特選紅茶的完美契合' }
+        ];
+
+        // Ensure 33 slots are handled
+        const TOTAL_STUDENTS = 33;
+
+        // UI state variables
+        let selectedDrinkId = 'pearl-milk'; // default choice
+        let selectedSeatNum = null;
+
+        async function startSystem() {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Authenticating
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        isOnline = true;
+                        updateSyncIndicator(true, "雲端已連線");
+                        listenToOrders();
+                    } else {
+                        isOnline = false;
+                        updateSyncIndicator(false, "未認證");
+                    }
+                });
+
+            } catch (err) {
+                console.warn("Could not connect to Firebase online storage, running in Demo Mode:", err);
+                isOnline = false;
+                updateSyncIndicator(false, "演示/離線模式");
+                // Local mockup listener
+                loadMockOrders();
+                renderAllUI();
+            }
+        }
+
+        // Path used matches Rule 1: /artifacts/{appId}/public/data/orders
+        function listenToOrders() {
+            if (!db) return;
+            const ordersCollection = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
+            
+            // Note: Rule 2 specifies we avoid complex queries. A simple query is perfect here.
+            onSnapshot(ordersCollection, (snapshot) => {
+                ordersData = {};
+                snapshot.forEach((doc) => {
+                    ordersData[doc.id] = doc.data();
+                });
+                renderAllUI();
+                updateSyncIndicator(true, "雲端同步成功");
+            }, (error) => {
+                console.error("Firestore Listen Failed:", error);
+                showToast("同步出錯，切換為本地預覽模式", "fa-triangle-exclamation");
+                updateSyncIndicator(false, "同步出錯");
+            });
+        }
+
+        // Local data setup for offline testing or fallback
+        function loadMockOrders() {
+            ordersData = {};
+            // Pre-populate a couple of demo orders so it doesn't look empty initially
+            ordersData['student_1'] = { name: "班長小王", drink: "珍珠奶茶", sugar: "半糖 (50%)", ice: "微冰", size: "大杯 (L)", paid: true, timestamp: Date.now() };
+            ordersData['student_2'] = { name: "李小明", drink: "檸檬紅茶", sugar: "少糖 (70%)", ice: "正常冰", size: "中杯 (M)", paid: false, timestamp: Date.now() };
+            ordersData['student_18'] = { name: "陳大文", drink: "茉香奶綠", sugar: "無糖 (0%)", ice: "去冰", size: "大杯 (L)", paid: false, timestamp: Date.now() };
+        }
+
+        // Sync Status Indicator update helper
+        function updateSyncIndicator(online, text) {
+            const el = document.getElementById('syncStatus');
+            const txt = document.getElementById('syncText');
+            if (!el) return;
+            if (online) {
+                el.className = "flex items-center space-x-2 px-3 py-1 bg-tenren-600 rounded-full text-xs text-green-300";
+                txt.textContent = text;
+            } else {
+                el.className = "flex items-center space-x-2 px-3 py-1 bg-yellow-600 rounded-full text-xs text-yellow-100 animate-pulse";
+                txt.textContent = text;
+            }
+        }
+
+        // Render all UI sections
+        function renderAllUI() {
+            renderDrinkChoiceCards();
+            renderQuickSeatSelector();
+            renderClassGrid();
+            renderStatsAndTable();
+            updateTotalsHeader();
+        }
+
+        // Render Drink Cards Custom Radio-like Selection
+        function renderDrinkChoiceCards() {
+            const container = document.getElementById('drinkOptions');
+            if (!container) return;
+            
+            container.innerHTML = DRINK_OPTIONS.map(drink => {
+                const isSelected = drink.name === getSelectedDrinkName();
+                return `
+                    <div onclick="window.selectDrink('${drink.id}')" id="card-${drink.id}" class="cursor-pointer border-2 ${isSelected ? 'border-tenren-500 bg-tenren-50' : 'border-gray-200 bg-white hover:border-gray-300'} p-4 rounded-xl transition-all duration-200 shadow-sm relative overflow-hidden group">
+                        <div class="flex items-start space-x-3">
+                            <span class="text-3xl">${drink.emoji}</span>
+                            <div class="space-y-0.5">
+                                <h4 class="font-bold text-gray-900 text-sm flex items-center">
+                                    ${drink.name}
+                                    ${isSelected ? '<span class="ml-2 w-2 h-2 rounded-full bg-tenren-accent inline-block"></span>' : ''}
+                                </h4>
+                                <p class="text-xs text-gray-500 leading-tight">${drink.desc}</p>
+                            </div>
+                        </div>
+                        <div class="absolute bottom-0 right-0 w-8 h-8 bg-tenren-500 text-white rounded-tl-xl flex items-center justify-center transform translate-x-8 translate-y-8 group-hover:translate-x-6 group-hover:translate-y-6 ${isSelected ? 'translate-x-0 translate-y-0' : ''} transition-all duration-300">
+                            <i class="fa-solid fa-check text-xs"></i>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getSelectedDrinkName() {
+            const found = DRINK_OPTIONS.find(d => d.id === selectedDrinkId);
+            return found ? found.name : '珍珠奶茶';
+        }
+
+        // Render Quick Selector Buttons (Tab 1 Sidebar)
+        function renderQuickSeatSelector() {
+            const container = document.getElementById('quickSeatContainer');
+            if (!container) return;
+
+            let html = '';
+            for (let i = 1; i <= TOTAL_STUDENTS; i++) {
+                const seatId = `student_${i}`;
+                const hasOrdered = ordersData[seatId] ? true : false;
+                const isCurrent = selectedSeatNum === i;
+                
+                let btnClass = "";
+                if (isCurrent) {
+                    btnClass = "bg-tenren-500 text-white border-transparent ring-2 ring-offset-2 ring-tenren-500 font-bold";
+                } else if (hasOrdered) {
+                    btnClass = "bg-tenren-100 text-tenren-700 border-tenren-300 font-bold hover:bg-tenren-200";
+                } else {
+                    btnClass = "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100";
+                }
+
+                html += `
+                    <button onclick="window.selectSeat(${i})" class="h-10 text-xs border rounded-lg transition-all flex flex-col items-center justify-center relative ${btnClass}">
+                        <span>${i}號</span>
+                        ${hasOrdered && !isCurrent ? '<span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-tenren-accent"></span>' : ''}
+                    </button>
+                `;
+            }
+            container.innerHTML = html;
+        }
+
+        // Render large grid representation of the class (Tab 2)
+        function renderClassGrid() {
+            const container = document.getElementById('seatingGrid');
+            if (!container) return;
+
+            let html = '';
+            for (let i = 1; i <= TOTAL_STUDENTS; i++) {
+                const seatId = `student_${i}`;
+                const order = ordersData[seatId];
+                
+                if (order) {
+                    html += `
+                        <div onclick="window.viewSeatDetails(${i})" class="cursor-pointer border border-tenren-300 bg-tenren-50/50 hover:bg-tenren-100/50 p-4 rounded-xl transition-all shadow-sm space-y-2 flex flex-col justify-between relative group">
+                            <div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-black text-tenren-600">${i} 號同學</span>
+                                    <span class="px-2 py-0.5 text-[10px] ${order.paid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} rounded-full font-bold">
+                                        ${order.paid ? '已付' : '未付'}
+                                    </span>
+                                </div>
+                                <h4 class="font-bold text-gray-800 text-sm mt-1.5 truncate flex items-center space-x-1">
+                                    <i class="fa-regular fa-id-badge text-tenren-accent text-xs"></i>
+                                    <span>${escapeHTML(order.name)}</span>
+                                </h4>
+                                <div class="text-[11px] font-semibold text-tenren-900 mt-2 bg-white px-2 py-1 rounded-md border border-tenren-100/60">
+                                    <i class="fa-solid fa-mug-hot text-[10px] text-tenren-500 mr-1"></i>
+                                    ${order.drink}
+                                </div>
+                                <p class="text-[10px] text-gray-500 mt-1 truncate">
+                                    ${order.size} / ${order.sugar} / ${order.ice}
+                                </p>
+                            </div>
+                            <div class="pt-2 border-t border-dashed border-gray-100 flex justify-between items-center text-[10px] text-gray-400">
+                                <span>按此查看/編輯</span>
+                                <i class="fa-solid fa-chevron-right transition-transform group-hover:translate-x-1"></i>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div onclick="window.claimSeat(${i})" class="cursor-pointer border border-dashed border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-400 p-4 rounded-xl transition-all shadow-sm min-h-[125px] flex flex-col justify-between group">
+                            <div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-medium text-gray-400">${i} 號席位</span>
+                                    <span class="w-2 h-2 rounded-full bg-gray-300"></span>
+                                </div>
+                                <p class="text-gray-400 text-xs italic mt-4">空置，點選下單</p>
+                            </div>
+                            <div class="pt-2 flex justify-between items-center text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span>立即點茶</span>
+                                <i class="fa-solid fa-plus text-tenren-500"></i>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            container.innerHTML = html;
+        }
+
+        // Render Tab 3 Summary (Tables, Aggregates)
+        function renderStatsAndTable() {
+            const tableBody = document.getElementById('summaryTableBody');
+            const statsContainer = document.getElementById('statsContainer');
+            const copyArea = document.getElementById('copyTemplateArea');
+            if (!tableBody || !statsContainer) return;
+
+            // 1. Details Table
+            let tableHTML = '';
+            let orderedCount = 0;
+
+            for (let i = 1; i <= TOTAL_STUDENTS; i++) {
+                const seatId = `student_${i}`;
+                const order = ordersData[seatId];
+
+                if (order) {
+                    orderedCount++;
+                    tableHTML += `
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-600">${i}號</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-xs font-semibold text-gray-800">${escapeHTML(order.name)}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-xs font-bold text-tenren-700">${order.drink}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-xs text-gray-500">${order.size} • ${order.sugar} • ${order.ice}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-xs">
+                                <button onclick="window.togglePayment('${seatId}')" class="px-2.5 py-1 rounded-full text-[10px] font-black tracking-wider transition-all duration-200 ${order.paid ? 'bg-green-100 text-green-700 border border-green-200 hover:bg-green-200' : 'bg-red-100 text-red-700 border border-red-200 hover:bg-red-200'}">
+                                    ${order.paid ? '✓ 已付' : '✗ 待付'}
+                                </button>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-right text-xs">
+                                <div class="flex justify-end space-x-2">
+                                    <button onclick="window.viewSeatDetails(${i})" class="text-tenren-500 hover:text-tenren-700 p-1" title="修改"><i class="fa-regular fa-pen-to-square"></i></button>
+                                    <button onclick="window.deleteOrderPrompt('${seatId}', ${i})" class="text-red-500 hover:text-red-700 p-1" title="刪除"><i class="fa-regular fa-trash-can"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    tableHTML += `
+                        <tr class="bg-gray-50/40 text-gray-400">
+                            <td class="px-4 py-2.5 whitespace-nowrap text-xs font-medium">${i}號</td>
+                            <td class="px-4 py-2.5 whitespace-nowrap text-xs italic" colspan="4">-- 尚未點餐 --</td>
+                            <td class="px-4 py-2.5 whitespace-nowrap text-right text-xs">
+                                <button onclick="window.claimSeat(${i})" class="px-3 py-1 bg-white hover:bg-gray-100 border border-gray-200 rounded text-[10px] font-bold text-gray-600 transition-all">+ 補登</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+            }
+            tableBody.innerHTML = tableHTML;
+
+            // 2. Aggregate / Statistics calculation
+            const drinkCounts = {};
+            const customizationCounts = {};
+            let unpaidCount = 0;
+            let paidCount = 0;
+
+            // Seed with requested drink options to always display options
+            DRINK_OPTIONS.forEach(d => {
+                drinkCounts[d.name] = 0;
+            });
+
+            Object.values(ordersData).forEach(ord => {
+                if (ord.drink) {
+                    drinkCounts[ord.drink] = (drinkCounts[ord.drink] || 0) + 1;
+                    
+                    const spec = `${ord.size} / ${ord.sugar} / ${ord.ice}`;
+                    customizationCounts[ord.drink] = customizationCounts[ord.drink] || [];
+                    customizationCounts[ord.drink].push(spec);
+                }
+                if (ord.paid) paidCount++;
+                else unpaidCount++;
+            });
+
+            // Populate visual stats panels
+            let statsHTML = '';
+            Object.keys(drinkCounts).forEach(drinkName => {
+                const count = drinkCounts[drinkName];
+                const percentage = orderedCount > 0 ? Math.round((count / orderedCount) * 100) : 0;
+                
+                // Collect breakdown details
+                let breakdownHTML = '';
+                if (customizationCounts[drinkName] && customizationCounts[drinkName].length > 0) {
+                    // Create an object of specific option counts
+                    const optMap = {};
+                    customizationCounts[drinkName].forEach(o => {
+                        optMap[o] = (optMap[o] || 0) + 1;
+                    });
+                    breakdownHTML = Object.entries(optMap).map(([optText, optCount]) => {
+                        return `<div class="text-[10px] text-gray-500 pl-4 py-0.5 border-l-2 border-tenren-100 flex justify-between">
+                            <span>• ${optText}</span>
+                            <span class="font-bold text-gray-700">x${optCount}杯</span>
+                        </div>`;
+                    }).join('');
+                } else {
+                    breakdownHTML = `<p class="text-[10px] text-gray-400 italic pl-4">暫無點單</p>`;
+                }
+
+                statsHTML += `
+                    <div class="border border-gray-100 rounded-xl p-4 space-y-2 bg-gradient-to-r from-white to-tenren-50/10">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-black text-sm text-gray-900">${drinkName}</h4>
+                            <span class="px-2.5 py-0.5 bg-tenren-500 text-white rounded-full text-xs font-bold">x ${count} 杯</span>
+                        </div>
+                        <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                            <div class="bg-tenren-accent h-1.5 rounded-full" style="width: ${percentage}%"></div>
+                        </div>
+                        <div class="pt-1.5 space-y-1">
+                            ${breakdownHTML}
+                        </div>
+                    </div>
+                `;
+            });
+            statsContainer.innerHTML = statsHTML;
+
+            // 3. Generate Copy Template
+            let templateText = `🥤 5A 班 天仁茗茶點單統計 🥤\n`;
+            templateText += `------------------------------\n`;
+            templateText += `全班總人數: 33 人\n`;
+            templateText += `已完成點餐: ${orderedCount} 人\n`;
+            templateText += `已付款: ${paidCount} 人 | 待付款: ${unpaidCount} 人\n`;
+            templateText += `------------------------------\n\n`;
+            templateText += `📝 飲品落單匯總統計:\n`;
+
+            let hasAny = false;
+            Object.keys(drinkCounts).forEach(drinkName => {
+                const count = drinkCounts[drinkName];
+                if (count > 0) {
+                    hasAny = true;
+                    templateText += `\n📌 ${drinkName} (共 ${count} 杯):\n`;
+                    
+                    const optMap = {};
+                    customizationCounts[drinkName].forEach(o => {
+                        optMap[o] = (optMap[o] || 0) + 1;
+                    });
+                    Object.entries(optMap).forEach(([optText, optCount]) => {
+                        templateText += `   - ${optText} x ${optCount}\n`;
+                    });
+                }
+            });
+
+            if (!hasAny) {
+                templateText += `(暫無同學提交點單)\n`;
+            }
+
+            templateText += `\n------------------------------\n`;
+            templateText += `👥 學生個別詳細對數名單:\n`;
+            for (let i = 1; i <= TOTAL_STUDENTS; i++) {
+                const seatId = `student_${i}`;
+                const order = ordersData[seatId];
+                if (order) {
+                    templateText += `座號 ${String(i).padStart(2, '0')} | ${order.name.padEnd(4, '　')} | ${order.drink} (${order.size}/${order.sugar}/${order.ice}) [${order.paid ? '已付' : '未付'}]\n`;
+                }
+            }
+
+            copyArea.value = templateText;
+        }
+
+        // Header and overall tab badges updates
+        function updateTotalsHeader() {
+            const orderedCount = Object.keys(ordersData).length;
+            const badge = document.getElementById('orderedCount');
+            if (badge) {
+                badge.textContent = orderedCount;
+            }
+        }
+
+        // Reset local / global form variables
+        window.clearForm = function() {
+            document.getElementById('studentName').value = "";
+            document.getElementById('sugarLevel').value = "半糖 (50%)";
+            document.getElementById('iceLevel').value = "微冰";
+            
+            // Set first radio to checked
+            const radios = document.getElementsByName('drinkSize');
+            if (radios.length > 0) radios[0].checked = true;
+
+            selectedDrinkId = 'pearl-milk';
+            selectedSeatNum = null;
+
+            document.getElementById('selectedSeatBadge').className = "px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold";
+            document.getElementById('selectedSeatBadge').textContent = "尚未選擇座號";
+
+            renderDrinkChoiceCards();
+            renderQuickSeatSelector();
+        };
+
+        // Select Drink Radio Logic
+        window.selectDrink = function(drinkId) {
+            selectedDrinkId = drinkId;
+            renderDrinkChoiceCards();
+        };
+
+        // Select Seat on Side column
+        window.selectSeat = function(seatNum) {
+            selectedSeatNum = seatNum;
+            const seatId = `student_${seatNum}`;
+            const existingOrder = ordersData[seatId];
+
+            // Badge Update
+            const badge = document.getElementById('selectedSeatBadge');
+            badge.className = "px-3 py-1 bg-tenren-accent text-tenren-900 rounded-full text-xs font-black shadow-sm flex items-center space-x-1 animate-bounce";
+            badge.innerHTML = `<i class="fa-solid fa-mug-hot"></i> <span>已選 ${seatNum} 號座席</span>`;
+
+            // If an order already exists for this seat, load it for easy editing
+            if (existingOrder) {
+                document.getElementById('studentName').value = existingOrder.name;
+                document.getElementById('sugarLevel').value = existingOrder.sugar || "半糖 (50%)";
+                document.getElementById('iceLevel').value = existingOrder.ice || "微冰";
+                
+                // Select proper drink
+                const drinkObj = DRINK_OPTIONS.find(d => d.name === existingOrder.drink);
+                if (drinkObj) {
+                    selectedDrinkId = drinkObj.id;
+                }
+
+                // Check correct size radio
+                const radios = document.getElementsByName('drinkSize');
+                for (let radio of radios) {
+                    if (radio.value === existingOrder.size) {
+                        radio.checked = true;
+                    }
+                }
+                
+                showToast(`已為您載入 ${seatNum} 號同學的現有訂單進行修改`, "fa-circle-info");
+            } else {
+                // Keep the input values but clear user name for convenience
+                document.getElementById('studentName').value = "";
+            }
+
+            renderDrinkChoiceCards();
+            renderQuickSeatSelector();
+        };
+
+        // Rapid order action from seating grid
+        window.claimSeat = function(seatNum) {
+            switchTab('order-tab');
+            window.selectSeat(seatNum);
+            // Autofocus student name
+            document.getElementById('studentName').focus();
+        };
+
+        // Submit handler to commit to Firestore
+        window.submitOrder = async function() {
+            if (!selectedSeatNum) {
+                showToast("請先在第一步選取您的座號！", "fa-triangle-exclamation");
+                return;
+            }
+
+            const nameInput = document.getElementById('studentName').value.trim();
+            if (!nameInput) {
+                showToast("請填寫您的同學名字或暱稱！", "fa-triangle-exclamation");
+                document.getElementById('studentName').focus();
+                return;
+            }
+
+            const selectedDrink = getSelectedDrinkName();
+            const sugar = document.getElementById('sugarLevel').value;
+            const ice = document.getElementById('iceLevel').value;
+            
+            let size = "中杯 (M)";
+            const radios = document.getElementsByName('drinkSize');
+            for (let r of radios) {
+                if (r.checked) {
+                    size = r.value;
+                }
+            }
+
+            const seatId = `student_${selectedSeatNum}`;
+            const existingOrder = ordersData[seatId];
+            
+            // Retain payment status if modifying existing order
+            const isPaid = existingOrder ? existingOrder.paid : false;
+
+            const orderPayload = {
+                name: nameInput,
+                drink: selectedDrink,
+                sugar: sugar,
+                ice: ice,
+                size: size,
+                paid: isPaid,
+                timestamp: Date.now()
+            };
+
+            if (isOnline && db) {
+                try {
+                    // Rule 1: Using strict pathing /artifacts/{appId}/public/data/orders/docId
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', seatId);
+                    await setDoc(docRef, orderPayload);
+                    showToast(`座號 ${selectedSeatNum} 點餐成功！資料已實時上傳雲端`, "fa-circle-check");
+                } catch (e) {
+                    console.error("Firebase submit error: ", e);
+                    showToast("上傳雲端失敗，已套用至本地瀏覽器", "fa-triangle-exclamation");
+                    ordersData[seatId] = orderPayload;
+                    renderAllUI();
+                }
+            } else {
+                // Offline demo fallback
+                ordersData[seatId] = orderPayload;
+                renderAllUI();
+                showToast(`[離線模式] 座號 ${selectedSeatNum} 已在本地點餐成功！`, "fa-circle-check");
+            }
+
+            // Clear selected parameters except the active one to avoid confusion
+            window.clearForm();
+        };
+
+        // Toggle Payment status locally/cloud
+        window.togglePayment = async function(seatId) {
+            const order = ordersData[seatId];
+            if (!order) return;
+
+            const newPaidStatus = !order.paid;
+            
+            if (isOnline && db) {
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', seatId);
+                    await updateDoc(docRef, { paid: newPaidStatus });
+                    showToast(`已變更收款狀態`, "fa-circle-check");
+                } catch (e) {
+                    console.error("Firebase update error: ", e);
+                    showToast("更新收款狀態失敗", "fa-triangle-exclamation");
+                }
+            } else {
+                ordersData[seatId].paid = newPaidStatus;
+                renderAllUI();
+                showToast(`[離線模式] 付款狀態已變更`, "fa-circle-check");
+            }
+        };
+
+        // Deleting single student order
+        window.deleteOrderPrompt = function(seatId, seatNum) {
+            const confirmTitle = document.getElementById('confirmTitle');
+            const confirmText = document.getElementById('confirmText');
+            const actionBtn = document.getElementById('confirmBtnAction');
+
+            confirmTitle.textContent = `取消 ${seatNum} 號點餐`;
+            confirmText.textContent = `您確定要取消並刪除 ${seatNum} 號同學的點單數據嗎？此動作將立即同步全班。`;
+            
+            actionBtn.onclick = async function() {
+                if (isOnline && db) {
+                    try {
+                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', seatId);
+                        await deleteDoc(docRef);
+                        showToast(`已刪除座號 ${seatNum} 點單`, "fa-circle-check");
+                    } catch (e) {
+                        console.error("Firebase delete error: ", e);
+                    }
+                } else {
+                    delete ordersData[seatId];
+                    renderAllUI();
+                    showToast(`[離線模式] 已刪除座號 ${seatNum} 點單`, "fa-circle-check");
+                }
+                closeConfirmModal();
+            };
+
+            document.getElementById('confirmModal').classList.remove('hidden');
+        };
+
+        // Reset ALL orders functionality
+        window.resetAllOrdersModal = function() {
+            const confirmTitle = document.getElementById('confirmTitle');
+            const confirmText = document.getElementById('confirmText');
+            const actionBtn = document.getElementById('confirmBtnAction');
+
+            confirmTitle.textContent = "危險：清除全班所有點單？";
+            confirmText.textContent = "此操作會永久刪除 5A 班中所有 33 位同學已提交的點單和付款記錄，並且不可復原。確定要繼續？";
+            
+            actionBtn.onclick = async function() {
+                if (isOnline && db) {
+                    try {
+                        // Batch delete requires writing batch (safe and quick for exactly 33 items maximum)
+                        const batch = writeBatch(db);
+                        for (let i = 1; i <= TOTAL_STUDENTS; i++) {
+                            const seatId = `student_${i}`;
+                            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', seatId);
+                            batch.delete(docRef);
+                        }
+                        await batch.commit();
+                        showToast("已重置清除全班所有點單數據！", "fa-circle-check");
+                    } catch (e) {
+                        console.error("Batch delete error: ", e);
+                        showToast("清除數據時出錯", "fa-triangle-exclamation");
+                    }
+                } else {
+                    ordersData = {};
+                    renderAllUI();
+                    showToast("[離線模式] 全班數據已清空！", "fa-circle-check");
+                }
+                closeConfirmModal();
+            };
+
+            document.getElementById('confirmModal').classList.remove('hidden');
+        };
+
+        // Popups View/Claim/Details triggers
+        window.viewSeatDetails = function(seatNum) {
+            const seatId = `student_${seatNum}`;
+            const order = ordersData[seatId];
+            if (!order) return;
+
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+            
+            modalTitle.textContent = `5A 班 ${seatNum} 號同學的點餐`;
+            
+            modalContent.innerHTML = `
+                <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-gray-500 font-bold">登記姓名</span>
+                        <span class="text-sm font-bold text-gray-800">${escapeHTML(order.name)}</span>
+                    </div>
+                    <div class="flex justify-between items-center border-t border-gray-200/50 pt-2.5">
+                        <span class="text-xs text-gray-500 font-bold">點選飲品</span>
+                        <span class="text-sm font-black text-tenren-700">${order.drink}</span>
+                    </div>
+                    <div class="flex justify-between items-center border-t border-gray-200/50 pt-2.5">
+                        <span class="text-xs text-gray-500 font-bold">客製規格</span>
+                        <span class="text-xs font-semibold text-gray-700">${order.size} / ${order.sugar} / ${order.ice}</span>
+                    </div>
+                    <div class="flex justify-between items-center border-t border-gray-200/50 pt-2.5">
+                        <span class="text-xs text-gray-500 font-bold">付款狀態</span>
+                        <span class="px-2.5 py-1 text-xs font-bold rounded-full ${order.paid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                            ${order.paid ? '✓ 已付' : '✗ 待付'}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="flex space-x-2 pt-4 border-t border-gray-100">
+                    <button onclick="window.togglePayment('${seatId}'); window.closeDetailModal();" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1">
+                        <i class="fa-solid fa-calculator"></i>
+                        <span>變更付款</span>
+                    </button>
+                    <button onclick="window.closeDetailModal(); window.selectSeat(${seatNum}); switchTab('order-tab');" class="flex-1 py-2.5 bg-tenren-500 hover:bg-tenren-600 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1">
+                        <i class="fa-regular fa-pen-to-square"></i>
+                        <span>修改訂單</span>
+                    </button>
+                    <button onclick="window.closeDetailModal(); window.deleteOrderPrompt('${seatId}', ${seatNum});" class="p-2.5 border border-red-200 hover:bg-red-50 text-red-500 rounded-xl text-xs transition-all" title="刪除此點單">
+                        <i class="fa-regular fa-trash-can"></i>
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('detailModal').classList.remove('hidden');
+        };
+
+        window.closeDetailModal = function() {
+            document.getElementById('detailModal').classList.add('hidden');
+        };
+
+        window.closeConfirmModal = function() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        };
+
+        // Switch Main Tabs Handler
+        window.switchTab = function(tabId) {
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.add('hidden'));
+
+            // Deactivate all tab buttons
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(btn => {
+                btn.className = "tab-btn py-4 px-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm flex items-center space-x-2 whitespace-nowrap";
+            });
+
+            // Show target
+            document.getElementById(tabId).classList.remove('hidden');
+
+            // Highlight target button
+            const activeBtn = document.getElementById(`btn-${tabId}`);
+            if (activeBtn) {
+                activeBtn.className = "tab-btn py-4 px-2 border-b-2 border-tenren-500 text-tenren-500 font-bold text-sm flex items-center space-x-2 whitespace-nowrap";
+            }
+        };
+
+        // Utility: HTML Escaping to prevent HTML injection
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        }
+
+        // Custom Toast Mechanism (Alternative to window.alert)
+        function showToast(message, iconName = "fa-circle-check") {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            if (!toast) return;
+
+            toastMsg.textContent = message;
+            toastIcon.innerHTML = `<i class="fa-solid ${iconName}"></i>`;
+
+            // Animate In
+            toast.className = "fixed bottom-5 right-5 z-50 transform translate-y-0 opacity-100 transition-all duration-300 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3";
+            
+            // Timeout to remove
+            setTimeout(() => {
+                toast.className = "fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 pointer-events-none";
+            }, 3000);
+        }
+
+        // Dynamic QR Code Logic
+        window.showQRCode = function() {
+            const qrModal = document.getElementById('qrModal');
+            const qrImg = document.getElementById('qrCodeImg');
+            const qrInput = document.getElementById('qrUrlInput');
+            if (!qrModal || !qrImg || !qrInput) return;
+
+            // Detect current URL automatically
+            let currentUrl = window.location.href;
+            
+            // If embedded inside iframe, try to read the outer frame referrer
+            try {
+                if (window.self !== window.top && document.referrer) {
+                    currentUrl = document.referrer;
+                }
+            } catch (e) {
+                console.warn("Iframe path reading restriction: ", e);
+            }
+
+            qrInput.value = currentUrl;
+            
+            // Generate QR Code Image from a high quality, fast public api
+            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentUrl)}`;
+            
+            // Open Modal
+            qrModal.classList.remove('hidden');
+        };
+
+        window.closeQRModal = function() {
+            const qrModal = document.getElementById('qrModal');
+            if (qrModal) qrModal.classList.add('hidden');
+        };
+
+        window.copyQRLink = function() {
+            const input = document.getElementById('qrUrlInput');
+            if (!input) return;
+            try {
+                input.select();
+                input.setSelectionRange(0, 99999);
+                document.execCommand('copy');
+                showToast("系統連線網址已複製到剪貼簿！", "fa-clipboard-check");
+            } catch (err) {
+                showToast("複製失敗，請手動長按選擇網址", "fa-triangle-exclamation");
+            }
+        };
+
+        // One-Click copy generated orders (using safe text-select fallback mechanism due to iframe compatibility)
+        window.copyOrderText = function() {
+            const copyArea = document.getElementById('copyTemplateArea');
+            if (!copyArea || !copyArea.value) {
+                showToast("暫無可複製的點單！", "fa-triangle-exclamation");
+                return;
+            }
+
+            try {
+                copyArea.select();
+                copyArea.setSelectionRange(0, 99999); // For mobile devices
+                document.execCommand('copy');
+                showToast("5A 班訂單匯總已成功複製至剪貼簿！", "fa-clipboard-check");
+            } catch (err) {
+                console.error("Copy failed", err);
+                showToast("複製失敗，請手動長按選擇文本複製", "fa-triangle-exclamation");
+            }
+        };
+
+        // Initialize everything on load
+        window.onload = function() {
+            startSystem();
+            renderDrinkChoiceCards();
+            renderQuickSeatSelector();
+        };
+
+    </script>
+</body>
+</html>
