@@ -499,6 +499,8 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
+                updateSyncIndicator(false, "正在進行身分認證...");
+
                 // RULE 3: Authenticate FIRST before running queries or operations
                 let userCredential;
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -509,24 +511,21 @@
 
                 currentUser = userCredential ? userCredential.user : null;
 
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        currentUser = user;
-                        isOnline = true;
-                        updateSyncIndicator(true, "雲端已連線");
-                        listenToOrders();
-                    } else {
-                        currentUser = null;
-                        isOnline = false;
-                        updateSyncIndicator(false, "未認證");
-                    }
-                });
+                if (currentUser) {
+                    isOnline = true;
+                    updateSyncIndicator(true, "雲端已認證，連線中...");
+                    listenToOrders();
+                } else {
+                    throw new Error("Authentication failed - User is null");
+                }
 
             } catch (err) {
-                console.warn("Could not connect to Firebase online storage, running in Demo Mode:", err);
+                console.error("Firebase Connection Error:", err);
                 isOnline = false;
-                updateSyncIndicator(false, "演示/離線模式");
-                loadMockOrders();
+                updateSyncIndicator(false, "雲端連線失敗");
+                showToast("無法連接到 Firebase 資料庫！請檢查網路設定與 Config。", "fa-triangle-exclamation");
+                // Reset ordersData to empty instead of loading fake mock data
+                ordersData = {};
                 renderAllUI();
             }
         }
@@ -543,20 +542,12 @@
                     ordersData[doc.id] = doc.data();
                 });
                 renderAllUI();
-                updateSyncIndicator(true, "雲端同步成功");
+                updateSyncIndicator(true, `雲端已同步 (共 ${Object.keys(ordersData).length} 筆)`);
             }, (error) => {
                 console.error("Firestore Listen Failed:", error);
-                showToast("同步出錯，切換為本地預覽模式", "fa-triangle-exclamation");
+                showToast("同步出錯，請檢查 Firebase Rules 安全規則！", "fa-triangle-exclamation");
                 updateSyncIndicator(false, "同步出錯");
             });
-        }
-
-        // Local fallback if firebase fails
-        function loadMockOrders() {
-            ordersData = {};
-            ordersData['student_1'] = { name: "班長小王", drink: "珍珠奶茶", sugar: "半糖 (50%)", ice: "微冰", size: "大杯 (L)", paid: true, timestamp: Date.now() };
-            ordersData['student_2'] = { name: "李小明", drink: "檸檬紅茶", sugar: "少糖 (70%)", ice: "正常冰", size: "中杯 (M)", paid: false, timestamp: Date.now() };
-            ordersData['student_18'] = { name: "陳大文", drink: "茉香奶綠", sugar: "無糖 (0%)", ice: "去冰", size: "大杯 (L)", paid: false, timestamp: Date.now() };
         }
 
         function updateSyncIndicator(online, text) {
@@ -966,19 +957,14 @@
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', seatId);
                     await setDoc(docRef, orderPayload);
                     showToast(`座號 ${selectedSeatNum} 點餐成功！資料已實時上傳雲端`, "fa-circle-check");
+                    window.clearForm();
                 } catch (e) {
                     console.error("Firebase submit error: ", e);
-                    showToast("上傳雲端失敗，已套用至本地瀏覽器", "fa-triangle-exclamation");
-                    ordersData[seatId] = orderPayload;
-                    renderAllUI();
+                    showToast("上傳雲端失敗，請確認 Firebase Rules 權限設定！", "fa-triangle-exclamation");
                 }
             } else {
-                ordersData[seatId] = orderPayload;
-                renderAllUI();
-                showToast(`[離線模式] 座號 ${selectedSeatNum} 已在本地點餐成功！`, "fa-circle-check");
+                showToast("系統未成功連線至雲端資料庫，無法完成下單！", "fa-triangle-exclamation");
             }
-
-            window.clearForm();
         };
 
         window.togglePayment = async function(seatId) {
@@ -994,12 +980,10 @@
                     showToast(`已變更收款狀態`, "fa-circle-check");
                 } catch (e) {
                     console.error("Firebase update error: ", e);
-                    showToast("更新收款狀態失敗", "fa-triangle-exclamation");
+                    showToast("更新收款狀態失敗，請重試", "fa-triangle-exclamation");
                 }
             } else {
-                ordersData[seatId].paid = newPaidStatus;
-                renderAllUI();
-                showToast(`[離線模式] 付款狀態已變更`, "fa-circle-check");
+                showToast("系統未成功連線至雲端，無法變更收款狀態！", "fa-triangle-exclamation");
             }
         };
 
@@ -1019,11 +1003,10 @@
                         showToast(`已刪除座號 ${seatNum} 點單`, "fa-circle-check");
                     } catch (e) {
                         console.error("Firebase delete error: ", e);
+                        showToast("刪除訂單失敗，請重試", "fa-triangle-exclamation");
                     }
                 } else {
-                    delete ordersData[seatId];
-                    renderAllUI();
-                    showToast(`[離線模式] 已刪除座號 ${seatNum} 點單`, "fa-circle-check");
+                    showToast("系統未成功連線至雲端，無法刪除！", "fa-triangle-exclamation");
                 }
                 closeConfirmModal();
             };
@@ -1052,12 +1035,10 @@
                         showToast("已重置清除全班所有點單數據！", "fa-circle-check");
                     } catch (e) {
                         console.error("Batch delete error: ", e);
-                        showToast("清除數據時出錯", "fa-triangle-exclamation");
+                        showToast("清除數據時出錯，請重試", "fa-triangle-exclamation");
                     }
                 } else {
-                    ordersData = {};
-                    renderAllUI();
-                    showToast("[離線模式] 全班數據已清空！", "fa-circle-check");
+                    showToast("系統未成功連線至雲端，無法重置！", "fa-triangle-exclamation");
                 }
                 closeConfirmModal();
             };
